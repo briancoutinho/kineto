@@ -20,7 +20,7 @@
 #include "ActivityBuffers.h"
 #include "ClientTraceActivity.h"
 #include "GenericTraceActivity.h"
-#include "ProcessInfo.h"
+#include "ThreadUtil.h"
 #include "TraceSpan.h"
 
 namespace KINETO_NAMESPACE {

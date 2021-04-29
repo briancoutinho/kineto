@@ -5,13 +5,10 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#include <fcntl.h>
 #include <fmt/format.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <strings.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <time.h>
 #include <chrono>
 
@@ -45,7 +42,7 @@ struct MockCpuActivityBuffer : public CpuTraceBuffer {
     op.startTime = startTime;
     op.endTime = endTime;
     op.device = 0;
-    op.sysThreadId = 123;
+    op.sysThreadId = systemThreadId();
     op.correlation = correlation;
     activities.push_back(std::move(op));
     span.opCount++;
@@ -70,7 +67,7 @@ struct MockCuptiActivityBuffer {
         start_us, end_us, correlation);
     act.kind = CUPTI_ACTIVITY_KIND_RUNTIME;
     act.cbid = cbid;
-    act.threadId = pthread_self();
+    act.threadId = threadId();
     activities.push_back(reinterpret_cast<CUpti_Activity*>(&act));
   }
 
@@ -252,7 +249,7 @@ TEST_F(ActivityProfilerTest, SyncTrace) {
   profiler.startTrace(start_time);
   profiler.stopTrace(start_time + microseconds(duration_us));
 
-  profiler.recordThreadInfo(123, pthread_self());
+  profiler.recordThreadInfo();
 
   // Log some cpu ops
   auto cpuOps = std::make_unique<MockCpuActivityBuffer>(
@@ -299,8 +296,9 @@ TEST_F(ActivityProfilerTest, SyncTrace) {
   EXPECT_EQ(activityCounts["kernel"], 2);
   EXPECT_EQ(activityCounts["Memcpy HtoD (Pinned -> Device)"], 1);
 
-  // Ops and runtime events are on thread 123
-  EXPECT_EQ(resourceIds[123], 6);
+  auto sysTid = systemThreadId();
+  // Ops and runtime events are on thread sysTid
+  EXPECT_EQ(resourceIds[sysTid], 6);
   // Kernels are on stream 1, memcpy on stream 2
   EXPECT_EQ(resourceIds[1], 2);
   EXPECT_EQ(resourceIds[2], 1);
@@ -339,7 +337,7 @@ TEST_F(ActivityProfilerTest, CorrelatedTimestampTest) {
   // When launching kernel, the CPU event should always precede the GPU event.
   int64_t kernelLaunchTime = 120;
 
-  profiler.recordThreadInfo(123, pthread_self());
+  profiler.recordThreadInfo();
 
   // set up CPU event
   auto cpuOps = std::make_unique<MockCpuActivityBuffer>(
